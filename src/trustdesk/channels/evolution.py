@@ -28,7 +28,7 @@ def parse_evolution(payload: dict) -> InboundMessage | None:
     return InboundMessage(
         channel=CHANNEL,
         message_id=message_id,
-        contact_id=contact_id,
+    contact_id=contact_id,
         text=text,
         from_me=bool(key.get("fromMe", False)),
         is_group=contact_id.endswith("@g.us")
