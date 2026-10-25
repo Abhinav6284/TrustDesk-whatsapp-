@@ -9,4 +9,4 @@ class InboundMessage:
     from_me: bool
     is_group: bool
 
-    
+
