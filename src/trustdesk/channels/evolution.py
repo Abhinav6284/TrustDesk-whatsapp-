@@ -1,4 +1,7 @@
 from .base import InboundMessage
+import httpx
+from trustdesk.config import settings
+
 
 CHANNEL = "evolution"
 MESSAGE_EVENTS = {"messages.upsert", "MESSAGES_UPSERT"}
@@ -28,8 +31,22 @@ def parse_evolution(payload: dict) -> InboundMessage | None:
     return InboundMessage(
         channel=CHANNEL,
         message_id=message_id,
-    contact_id=contact_id,
+        contact_id=contact_id,
         text=text,
         from_me=bool(key.get("fromMe", False)),
         is_group=contact_id.endswith("@g.us")
     )
+
+
+async def send_text(client: httpx.AsyncClient,
+                    contact_id: str, text: str) -> None:
+    number = contact_id.split("@")[0]
+    url = f"{settings.evolution_url}/message/sendText/{settings.evolution_instance}"
+    response = await client.post(
+        url,
+        headers={"apikey": settings.evolution_api_key.get_secret_value()},
+        json={"number": number, "text": text},
+        timeout=10.0,
+
+    )
+    response.raise_for_status()
