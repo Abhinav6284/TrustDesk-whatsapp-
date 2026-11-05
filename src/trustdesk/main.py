@@ -2,6 +2,8 @@ import logging
 from fastapi import FastAPI, Request, BackgroundTasks, background
 from .channels.evolution import parse_evolution
 from contextlib import asynccontextmanager
+from fastapi.responses import PlainTextResponse
+from trustdesk.config import settings
 
 import httpx
 
@@ -54,3 +56,18 @@ async def evolution_webhook(request: Request, background: BackgroundTasks) -> di
     log.info("message from %s: %s", msg.contact_id, msg.text)
     background.add_task(reply, request.app.state.http, msg)
     return {"ok": True}
+
+
+@app.get("/webhooks/meta")
+async def meta_verify(request: Request):
+    params = request.query_params
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge", "")
+
+    if mode == "subscribe" and token == settings.meta_verify_token.get_secret_value():
+        log.info("meta webhook verified")
+        return PlainTextResponse(challenge)
+
+    log.warning("meta verify failed (mode=%s)", mode)
+    return PlainTextResponse("forbidden", status_code=403)
