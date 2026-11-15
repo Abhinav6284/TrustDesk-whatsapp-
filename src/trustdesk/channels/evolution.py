@@ -1,7 +1,8 @@
-from .base import InboundMessage
 import httpx
+
 from trustdesk.config import settings
 
+from .base import InboundMessage
 
 CHANNEL = "evolution"
 MESSAGE_EVENTS = {"messages.upsert", "MESSAGES_UPSERT"}
