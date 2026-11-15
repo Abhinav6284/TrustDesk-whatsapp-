@@ -40,7 +40,7 @@ async def send_text(client: httpx.AsyncClient, to: str, text: str) -> None:
     response = await client.post(
         url,
         headers={
-            "Authorization": f"Bearer {settings.meta_access_tokeb.get_secret_value()}"},
+            "Authorization": f"Bearer {settings.meta_access_token.get_secret_value()}"},
         json={"messaging_product": "whatsapp",
               "to": to, "text": {"body": text}},
         timeout=10.0,

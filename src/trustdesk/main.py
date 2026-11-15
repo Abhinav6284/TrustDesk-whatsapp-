@@ -4,11 +4,13 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import PlainTextResponse
+from redis.asyncio import Redis
 
 from trustdesk.channels import meta
 from trustdesk.channels.base import InboundMessage
 from trustdesk.channels.evolution import parse_evolution, send_text
 from trustdesk.config import settings
+from trustdesk.dedupe import is_new
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -18,8 +20,10 @@ log = logging.getLogger("trustdesk")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.http = httpx.AsyncClient()
+    app.state.redis = Redis.from_url(settings.redis_url)
     yield
     await app.state.http.aclose()
+    await app.state.redis.aclose()
 
 
 app = FastAPI(title="TrustDesk", lifespan=lifespan)
@@ -66,6 +70,9 @@ async def evolution_webhook(request: Request, background: BackgroundTasks) -> di
     if msg.from_me or msg.is_group:
         log.info("ignored: from_me=%s is_group=%s", msg.from_me, msg.is_group)
         return {"ok": True}
+    if not await is_new(request.app.state.redis, msg):
+        log.info("duplicate ignored: %s", msg.message_id)
+        return {"ok": True}
 
     log.info("message from %s: %s", msg.contact_id, msg.text)
     background.add_task(reply, request.app.state.http, msg)
@@ -98,6 +105,9 @@ async def meta_webhook(request: Request, background: BackgroundTasks):
     for msg in msgs:
         if not _allowed(msg.contact_id):
             log.info("meta: ignored, not in allowlist")
+            continue
+        if not await is_new(request.app.state.redis, msg):
+            log.info("meta: duplicate ignored: %s", msg.message_id)
             continue
         log.info("meta message from %s: %s", msg.contact_id, msg.text)
         background.add_task(meta_reply, request.app.state.http, msg)
